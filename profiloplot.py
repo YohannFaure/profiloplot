@@ -166,6 +166,7 @@ def tendency_removal(data_per_row_in,position_interpolation,reference=100,refere
     return(data_per_row)
 
 
+
 def tendency_removal_per_row(data_per_row_in,position_interpolation,reference=100,reference_size=10):
     """
     Removes the tendency for each row, independantly of the others !
@@ -188,10 +189,38 @@ def tendency_removal_per_row(data_per_row_in,position_interpolation,reference=10
 
 
 
+## remove outliars
+
+
+def outliars_removal(data_per_row,width=5):
+    """
+    Remove elements that do not make sense
+    doesn't seem to work...
+    """
+    new_list=[]
+    for i in range(len(data_per_row)):
+        rem=[]
+        for j in range(1,len(data_per_row[i])-1):
+            left_jump =abs(data_per_row[i][j,0]-data_per_row[i][j-1,0])
+            right_jump=abs(data_per_row[i][j,0]-data_per_row[i][j+1,0])
+            if right_jump>width and left_jump<width :
+                rem.append(j)
+        keep=np.array( [k for k in range(len(data_per_row[i])) if not k in rem] )
+        new_list.append(data_per_row[i][keep])
+    return(new_list)
+
+
+
+
 
 ## reconstruct profile (position)
 
-def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=1,mult=1):
+def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=0,mult=1):
+    """
+    Plots the result of the data analysis.
+    row_spacing : shifts the successive rows for lisibility
+    mult : multiplies the result by a constant (useful if you used the wrong pointer)
+    """
     for j in range(len(positions_per_row)):
         x = positions_interpolations[j](data_per_row[j][:,2])
         y = positions_per_row[j][0,1]- positions_per_row[0][0,1]
