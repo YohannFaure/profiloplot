@@ -1,12 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
+import os
 
 def open_profilo(folder):
     """
     Opens the raw data from the profilometer
     dat : (n, 4)  float30 array
+        Altitude; Intensity; Buffer time (in ms)
     pos : (m, 4)  float32 array
+        X; Y; Buffer time (in ms)
     des : (14, 2) str array
     """
     if folder[-1]!="/":
@@ -228,8 +231,17 @@ def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spa
         plt.plot(x,h+j*row_spacing,label='y={:10.2f} mm'.format(y))
     plt.legend()
     plt.grid(which='both')
-    return(None)
+    return(x,h)
 
+def substract_trend(calib,data_per_row,positions_interpolations):
+    """
+    Substract the trend in the folder `calib`
+    """
+    a=calibration_deviation_profilo(calib)
+    for j in range(len(data_per_row)):
+        x = positions_interpolations[j](data_per_row[j][:,2])
+        data_per_row[j][:,0] = data_per_row[j][:,0]-a(x)
+    return(data_per_row)
 
 
 ## Profile average
@@ -253,4 +265,191 @@ def average_profile_plot(positions_per_row,data_per_row,positions_interpolations
     return(None)
 
 
+
+def fully_open_data(location,calibration=None):
+    """
+    Functionnalization of all the work done when opening the file.
+    Input :
+        location :
+            the location of the file you want to use
+        calibration
+            the location of the Altitude calibration to use
+            if None, no calibration is done
+    output :
+        positions_per_row :
+            list, containing arrays describing position
+            Each array corresponds to one measurement row
+            format of each array:
+                   [[X(t_0), Y(t_0), t_0 (ms)],
+                    [X(t_1), Y(t_1), t_1 (ms),
+                    ...,
+                    [X(t_m), Y(t_m), t_m (ms)]], dtype=float32)
+        data_per_row
+            list, containing arrays describing ALtitude and Intensity
+            Each array corresponds to one measurement row
+            format of each array:
+                   [[A(t'_0), I(t'_0), t'_0 (ms)],
+                    [1(t'_1), I(t'_1), t'_1 (ms),
+                    ...,
+                    [A(t'_n), I(t'_n), t'_n (ms)]], dtype=float32)
+        positions_interpolations
+            list, containing <scipy.interp1d>
+            Each <scipy.interp1d> corresponds to a function that interpolates
+            the position of data_per_row from its time.
+    """
+    # this line is used to fix a bug in the software
+    correct_description(location)
+
+    # open the data
+    full_info=open_profilo(location)
+    data=full_info[0]
+    positions=full_info[1]
+    description=full_info[2]
+
+    # Apply proper cleaning (some may not apply to your usecase)
+    # Crop the zeros, due to bad reading of the profilometer
+    data=crop_data_clean(data)
+
+    # Interpolate profilometer times
+    data=interpol_time(data,description)
+
+    # Separate data in rows
+    positions_per_row=separate_rows(positions)
+    data_per_row=separate_rows(data)
+
+    # Interpolate positions of Zaber
+    # Clean positions out of interpolation range
+    data_per_row=clean_data_interpol(data_per_row,positions_per_row)
+
+    #this line doesn't work...
+    #data_per_row=outliars_removal(data_per_row,width=0.2)
+
+    # Interpolate
+    positions_interpolations = full_position_interpolation(positions_per_row)
+
+    # Remove the variations due to the Zaber translation plates
+    if calibration:
+        data_per_row = substract_trend(calibration,data_per_row,positions_interpolations)
+
+    return(positions_per_row,data_per_row,positions_interpolations)
+
+
+
+
+
+## smoothing
+def savitzky_golay(y, window_size, order, deriv=0, rate=1):
+    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
+    The Savitzky-Golay filter removes high frequency noise from data.
+    It has the advantage of preserving the original shape and
+    features of the signal better than other types of filtering
+    approaches, such as moving averages techniques.
+    Parameters
+    ----------
+    y : array_like, shape (N,)
+        the values of the time history of the signal.
+    window_size : int
+        the length of the window. Must be an odd integer number.
+    order : int
+        the order of the polynomial used in the filtering.
+        Must be less then `window_size` - 1.
+    deriv: int
+        the order of the derivative to compute (default = 0 means only smoothing)
+    Returns
+    -------
+    ys : ndarray, shape (N)
+        the smoothed signal (or it's n-th derivative).
+    Notes
+    -----
+    The Savitzky-Golay is a type of low-pass filter, particularly
+    suited for smoothing noisy data. The main idea behind this
+    approach is to make for each point a least-square fit with a
+    polynomial of high order over a odd-sized window centered at
+    the point.
+    Examples
+    --------
+    t = np.linspace(-4, 4, 500)
+    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
+    ysg = savitzky_golay(y, window_size=31, order=4)
+    import matplotlib.pyplot as plt
+    plt.plot(t, y, label='Noisy signal')
+    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
+    plt.plot(t, ysg, 'r', label='Filtered signal')
+    plt.legend()
+    plt.show()
+    References
+    ----------
+    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
+       Data by Simplified Least Squares Procedures. Analytical
+       Chemistry, 1964, 36 (8), pp 1627-1639.
+    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
+       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
+       Cambridge University Press ISBN-13: 9780521880688
+    """
+    import numpy as np
+    from math import factorial
+
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    y = np.concatenate((firstvals, y, lastvals))
+    return np.convolve( m[::-1], y, mode='valid')
+
+def calibration_deviation_profilo(location, plot=False):
+    """
+    Location must contain a folder, containing several acquisitions that will be
+    used as a reference to make a proper zero for the altitude axis.
+    ! Only the last row of every acquisition will be taken into account !
+
+    output : np.poly1d that fits x
+    """
+    # open the data
+    xs=[]
+    hs=[]
+    for file in os.listdir(location):
+        positions_per_row,data_per_row,positions_interpolations=fully_open_data(location+file)
+        data_per_row=tendency_removal(data_per_row,positions_interpolations,reference=100)
+        data_per_row=tendency_removal_per_row(data_per_row,positions_interpolations,reference=100)
+        x,h=profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=0,mult=1)
+        xs.append(x)
+        hs.append(h)
+    plt.close()
+    # clean the data format
+    xtot=[]
+    htot=[]
+    for i in range(len(xs)):
+        xtot=xtot+list(xs[i])
+        htot=htot+list(hs[i])
+    # sort x
+    zipped_lists = zip(xtot, htot)
+    sorted_pairs = sorted(zipped_lists)
+    tuples = zip(*sorted_pairs)
+    xtot, htot= [ list(tuple) for tuple in  tuples]
+    xtot=np.array(xtot)
+    htot=np.array(htot)
+    # make a mean befor fitting
+    mean_x_axis = [i for i in range(int(max([max(j) for j in xs])))]
+    ys_interp = [np.interp(mean_x_axis, xs[i], hs[i]) for i in range(len(xs))]
+    mean_y_axis = np.mean(ys_interp, axis=0)
+    # fit
+    a=np.poly1d(np.polyfit(mean_x_axis,mean_y_axis,9))
+    # plot to check
+    if plot:
+        htotfit=a(xtot)
+        plt.scatter(xtot,htot)
+        plt.plot(mean_x_axis, mean_y_axis,color="orange")
+        yhat=savitzky_golay(htotfit,51,3)
+        plt.plot(xtot,yhat,color="red")
+        plt.show()
+    return(a)
 
