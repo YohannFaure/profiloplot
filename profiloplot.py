@@ -307,11 +307,13 @@ def fully_open_data(location,calibration=None):
     description=full_info[2]
 
     # Apply proper cleaning (some may not apply to your usecase)
-    # Crop the zeros, due to bad reading of the profilometer
-    data=crop_data_clean(data)
 
     # Interpolate profilometer times
     data=interpol_time(data,description)
+
+    # Crop the zeros, due to bad reading of the profilometer
+    data=crop_data_clean(data)
+
 
     # Separate data in rows
     positions_per_row=separate_rows(positions)
@@ -420,10 +422,11 @@ def calibration_deviation_profilo(location, plot=False):
         positions_per_row,data_per_row,positions_interpolations=fully_open_data(location+file)
         data_per_row=tendency_removal(data_per_row,positions_interpolations,reference=100)
         data_per_row=tendency_removal_per_row(data_per_row,positions_interpolations,reference=100)
-        x,h=profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=0,mult=1)
-        xs.append(x)
-        hs.append(h)
-    plt.close()
+        for j in range(len(positions_interpolations)):
+            x = positions_interpolations[j](data_per_row[j][:,2])
+            h = data_per_row[j][:,0]
+            xs.append(x)
+            hs.append(h)
     # clean the data format
     xtot=[]
     htot=[]
