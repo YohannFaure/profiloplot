@@ -8,7 +8,7 @@ exec(open("C:/Users/User/Desktop/profiloplot/profiloplot.py").read())
 
 
 ## Open the files
-location="C:/Users/User/Desktop/bloc1_p6_propre/"
+location="C:/Users/User/Desktop/profil_blocs/bloc1_p5_propre/"
 calibration="C:/Users/User/Desktop/profiloplot/calibprofilo/"
 
 
