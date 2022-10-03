@@ -1,7 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy import interpolate
 import os
+from matplotlib.ticker import LinearLocator
+from mpl_toolkits.mplot3d import Axes3D
+
 
 def open_profilo(folder):
     """
@@ -143,6 +147,7 @@ def tendency_removal(data_per_row_in,position_interpolation,reference=100,refere
     """
     Removes the global tendency for a full experiment (same correction to all rows)
     remove_orthogonal : remove a potential tilt in orthogonal direction to the rows
+    reference : use to specify the two reference points on which are computed the tendency
     """
     data_per_row=[np.copy(row) for row in data_per_row_in]
     #first along a row
@@ -161,11 +166,11 @@ def tendency_removal(data_per_row_in,position_interpolation,reference=100,refere
     for j in range(n_rows):
         data_per_row[j][:,0]=data_per_row[j][:,0]-avg_start[1]- (( pi[j](data_per_row[j][:,2]) - avg_start[0] )/(avg_end[0]-avg_start[0]))*(avg_end[1]-avg_start[1])
     if remove_orthogonal:
-        #then orthogonal to the row
-        start-=avg_start
-        end-=avg_end
+        #then orthogonal to the rows
+        start = np.average(data_per_row[0][:,0])
+        end = np.average(data_per_row[-1][:,0])
         for j in range(n_rows):
-            data_per_row[j][:,0]=data_per_row[j][:,0]-start[0,1]-(start[-1,1]-start[0,1])*j/n_rows
+            data_per_row[j][:,0]=data_per_row[j][:,0]-start-(end-start)*j/n_rows
     return(data_per_row)
 
 
@@ -218,7 +223,7 @@ def outliars_removal(data_per_row,width=5):
 
 ## reconstruct profile (position)
 
-def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=0,mult=1):
+def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spacing=0,mult=1,**kwargs):
     """
     Plots the result of the data analysis.
     row_spacing : shifts the successive rows for lisibility
@@ -228,7 +233,7 @@ def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spa
         x = positions_interpolations[j](data_per_row[j][:,2])
         y = positions_per_row[j][0,1]- positions_per_row[0][0,1]
         h = mult*data_per_row[j][:,0]
-        plt.plot(x,h+j*row_spacing,label='y={:10.2f} mm'.format(y))
+        plt.plot(x,h+j*row_spacing,label='y={:10.2f} mm'.format(y),**kwargs)
     plt.legend()
     plt.grid(which='both')
     return(x,h)
@@ -455,4 +460,95 @@ def calibration_deviation_profilo(location, plot=False):
         plt.plot(xtot,yhat,color="red")
         plt.show()
     return(a)
+
+
+
+### Profile plot in 3D
+
+
+def x_interpol_i(x,positions_per_row_i,data_per_row_i,positions_interpolations_i):
+    """
+    interpolates the positions with a cubic function
+    x : positions to compute
+    ..._i : element of ...
+    output : f(x)
+    """
+    x_reel = positions_interpolations_i(data_per_row_i[:,2])
+    f_interp = interpolate.interp1d(x_reel, data_per_row_i[:,0], kind='linear')
+    return(f_interp(x))
+
+def x_interpol(step,positions_per_row, data_per_row, positions_interpolations):
+    """
+    Interpolates the data to put it on a grid
+    step = interpolation step (mm)
+    """
+    y=[]
+    h=[]
+    x_reel = positions_interpolations[0](data_per_row[0][:,2])
+    x=np.arange(x_reel[1],x_reel[-2],step)
+    for i in range(len(positions_per_row)):
+        y.append(positions_per_row[i][0,1]- positions_per_row[0][0,1])
+        h.append(x_interpol_i(x,positions_per_row[i],data_per_row[i],positions_interpolations[i]))
+    return(x,np.array(y),np.array(h))
+
+
+def profile_plot_3D_interpol(step,positions_per_row, data_per_row, positions_interpolations,mult=1):
+    """
+    Plots a 3D profile with interpolation
+    step = interpolation step (mm)
+    """
+    x,y,h=x_interpol(1,positions_per_row, data_per_row, positions_interpolations)
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    # Make data.
+    X, Y = np.meshgrid(x, y)
+    Z = h
+
+    # Plot the surface.
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    return(fig,ax,surf)
+
+def profile_plot_3D_meshed(x,y,h):
+    """
+    Plots a meshed surface (with the same Xs for all data)
+    """
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    # Make data.
+    X, Y = np.meshgrid(x, y)
+    Z = h
+
+    # Plot the surface.
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=True)
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    return(fig,ax,surf)
+
+def profile_plot_3D(positions_per_row, data_per_row, positions_interpolations, mult=1):
+    """
+    Plots the result of the data analysis.
+    mult : multiplies the result by a constant (useful if you used the wrong pointer)
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    #ax.set(xlim=(0, 150), ylim=(0, 150))
+    X=[]
+    Y=[]
+    H=[]
+    for j in range(len(positions_per_row)):
+        x = positions_interpolations[j](data_per_row[j][:,2])
+        y = positions_per_row[j][0,1]- positions_per_row[0][0,1]
+        h = mult*data_per_row[j][:,0]
+        for xi in x:
+            X.append(xi)
+            Y.append(y)
+        for hi in h:
+            H.append(hi)
+    surf = ax.plot_trisurf(X, Y, H, cmap=cm.coolwarm,antialiased=False)
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    return(fig,ax,surf)
+
+
 
