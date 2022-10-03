@@ -484,8 +484,11 @@ def x_interpol(step,positions_per_row, data_per_row, positions_interpolations):
     """
     y=[]
     h=[]
-    x_reel = positions_interpolations[0](data_per_row[0][:,2])
-    x=np.arange(x_reel[1],x_reel[-2],step)
+
+    x_start_max = max( [positions_interpolations[i](data_per_row[i][:,2])[0] for i in range(len(positions_per_row))] )
+    x_end_min=min([positions_interpolations[i](data_per_row[i][:,2])[-1] for i in range(len(positions_per_row))] )
+    x=np.arange(x_start_max,x_end_min,step)
+
     for i in range(len(positions_per_row)):
         y.append(positions_per_row[i][0,1]- positions_per_row[0][0,1])
         h.append(x_interpol_i(x,positions_per_row[i],data_per_row[i],positions_interpolations[i]))
