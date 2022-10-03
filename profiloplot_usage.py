@@ -41,15 +41,13 @@ plt.show()
 # Interpolation step (to create a single X-axis for all lines)
 step=0.01 #mm
 
-fig,ax,surf = profile_plot_3D_interpol(step, positions_per_row, data_per_row, positions_interpolations)
+profile_plot_3D_interpol(step, positions_per_row, data_per_row, positions_interpolations)
 
-fig.show()
 
 ### Full polygon plot (this might crash, very power hungry)
 
-fig,ax,surf = profile_plot_3D(positions_per_row, data_per_row, positions_interpolations)
+profile_plot_3D(positions_per_row, data_per_row, positions_interpolations)
 
-fig.show()
 
 
 

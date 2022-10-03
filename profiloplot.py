@@ -502,16 +502,18 @@ def profile_plot_3D_interpol(step,positions_per_row, data_per_row, positions_int
     """
     x,y,h=x_interpol(1,positions_per_row, data_per_row, positions_interpolations)
     fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    ax = plt.axes(projection ='3d')
     # Make data.
     X, Y = np.meshgrid(x, y)
     Z = h
 
     # Plot the surface.
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=True)
     # Add a color bar which maps values to colors.
     fig.colorbar(surf, shrink=0.5, aspect=5)
-    return(fig,ax,surf)
+    plt.show()
+
+
 
 def profile_plot_3D_meshed(x,y,h):
     """
@@ -527,7 +529,8 @@ def profile_plot_3D_meshed(x,y,h):
     surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=True)
     # Add a color bar which maps values to colors.
     fig.colorbar(surf, shrink=0.5, aspect=5)
-    return(fig,ax,surf)
+    plt.show()
+
 
 def profile_plot_3D(positions_per_row, data_per_row, positions_interpolations, mult=1):
     """
@@ -551,7 +554,6 @@ def profile_plot_3D(positions_per_row, data_per_row, positions_interpolations, m
             H.append(hi)
     surf = ax.plot_trisurf(X, Y, H, cmap=cm.coolwarm,antialiased=False)
     fig.colorbar(surf, shrink=0.5, aspect=5)
-    return(fig,ax,surf)
-
+    plt.show()
 
 
