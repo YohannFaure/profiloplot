@@ -9,6 +9,7 @@ exec(open("C:/Users/User/Desktop/profiloplot/profiloplot.py").read())
 
 ## Open the files
 location="C:/Users/User/Desktop/profil_blocs/bloc1_p5_propre/"
+location="C:/Users/User/Documents/Acquisition backups/_2022_12_08_10_10_30"
 calibration="C:/Users/User/Desktop/profiloplot/calibprofilo/"
 
 
@@ -20,7 +21,7 @@ data_per_row=tendency_removal(data_per_row,positions_interpolations)#,remove_ort
 
 
 
-# Different for each row (removes the profile in y axis)
+#Different for each row (removes the profile in y axis)
 #data_per_row=tendency_removal_per_row(data_per_row,positions_interpolations,reference=100)
 
 
@@ -49,9 +50,9 @@ profile_plot_3D_interpol(step, positions_per_row, data_per_row, positions_interp
 profile_plot_3D(positions_per_row, data_per_row, positions_interpolations)
 
 
+### 2D altimetry
 
-
-
+profile_plot_2D_interpol(0.005,positions_per_row, data_per_row, positions_interpolations,mult=1)
 
 
 
