@@ -234,7 +234,7 @@ def profile_plot(positions_per_row,data_per_row,positions_interpolations,row_spa
         y = positions_per_row[j][0,1]- positions_per_row[0][0,1]
         h = mult*data_per_row[j][:,0]
         plt.plot(x,h+j*row_spacing,label='y={:10.2f} mm'.format(y),**kwargs)
-    plt.legend()
+    #plt.legend()
     plt.grid(which='both')
     return(x,h)
 
@@ -495,7 +495,7 @@ def x_interpol(step,positions_per_row, data_per_row, positions_interpolations):
     return(x,np.array(y),np.array(h))
 
 
-def profile_plot_3D_interpol(step,positions_per_row, data_per_row, positions_interpolations,mult=1):
+def profile_plot_3D_interpol(step,positions_per_row, data_per_row, positions_interpolations,mult=1,limits = None):
     """
     Plots a 3D profile with interpolation
     step = interpolation step (mm)
@@ -506,6 +506,14 @@ def profile_plot_3D_interpol(step,positions_per_row, data_per_row, positions_int
     # Make data.
     X, Y = np.meshgrid(x, y)
     Z = h
+    Z[np.isnan(Z)]=0
+    if not limits is None:
+        zmin=limits[0]
+        zmax=limits[1]
+        Z[Z>zmax] = zmax
+        Z[Z<zmin] = zmin
+    Z-=np.min(Z)
+
 
     # Plot the surface.
     surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,linewidth=0, antialiased=True)
